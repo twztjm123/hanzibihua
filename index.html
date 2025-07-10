@@ -321,7 +321,7 @@
 
         // 查询汉字信息
         async function queryChars(chars) {
-            if (API_KEY === "你的API Key" || SECRET_KEY === "你的Secret Key") {
+            if (API_KEY === "LSsWz8AT0EyF95LxvhwPnPQY" || SECRET_KEY === "2aWNfGaHApQuT1YYzEUSkTRqBI8Qc10x") {
                 queryError.textContent = "请先配置正确的API Key和Secret Key";
                 queryError.style.display = "block";
                 return;
@@ -385,58 +385,56 @@
             resultContainer.innerHTML = "";
             
             如果 (项目.长度 === 0) {
-                结果容器.内联样式 = "<div>未找到匹配的汉字数据</div>";
+                resultContainer.innerHTML = "<div>未找到匹配的汉字数据</div>";
                 返回;
             输入：}
             
-            . => forEach(item{
-                const card = document.;createElement("div")
-                卡片.类名 = "角色卡片";
+            项目.每个(项目 => {
+                常量 卡片 = 文档.创建元素("div");
+                卡片.类名 = "字符卡片";
                 
                 // 构建笔顺步骤HTML
                 让 笔画Html = "";
-                如果 (物品.笔画 && 物品.笔画.长度) {
-                    项目.笔画.遍历((笔画, 索引) => {
-                        笔画HTML += `
-
-
-                            <div class="stroke-step">
-                                <div class="step-num">${index1}</div>
-                                <div class="step-char">${stroke}</div>
-                            </div>
-                        `;
+                如果 (项目.笔画 && 项目.笔画.长度) {
+                    项目.笔画.forEach((笔画, 索引) => {
+                        笔画Html += ``
+                            
+                                <div class="step-num">索引 + 1}</div>
+                                <div class="step-char">${笔画}</div>
+                            
+                        '
                     });
-                } else {
-                    strokesHtml = `<div class="step-char" style="width:100%;text-align:center">暂无笔顺数据</div>`;
-                }
+                } 否则{
+                    strokesHtml = `<div class="step-char" style="width:100%;text-align:center">暂无笔画数据</div>`;
+                输入：}
                 
-                card.innerHTML = `
-                    <div class="char-big">${item.char}</div>
-                    <div class="info-row">
+                卡片.innerHTML = ``
+                    <div class="char-big">{$item.char}</div>
+                    
                         <span class="info-label">拼音</span>
-                        <span>${item.pinyin || "未知"}</span>
+                        <span>${商品.拼音 || "未知"}</span>
                     </div>
-                    <div class="info-row">
-                        <span class="info-label">部首</span>
-                        <span>${item.radical || "未知"}</span>
+                    
+                        部首
+                        <span>${商品.部首 || "未知"}</span>
                     </div>
-                    <div class="info-row">
-                        <span class="info-label">笔画</span>
-                        <span>${item.stroke_count || "未知"}</span>
+                    
+                        笔画
+                        <span>${商品.笔画数 || "未知"}</span>
                     </div>
-                    <div class="info-row">
-                        <span class="info-label">结构</span>
-                        <span>${item.structure || "未知"}</span>
+                    
+                        结构
+                        <span>${项目.结构 || "未知"}</span>
                     </div>
-                    <div class="stroke-title">笔顺</div>
-                    <div class="stroke-steps">
-                        ${strokesHtml}
+                    笔顺
+                    
+                        (< <>$>{笔画HTML})
                     </div>
-                `;
+                三是
                 
-                resultContainer.;appendChild(card)
+                结果容器.添加子元素(卡片);
             });
-        }
-    </script>
-</body>
-</html>
+        输入：}
+    </脚本>
+</主体>
+        </html>
