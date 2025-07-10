@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>汉字图片识别与笔画展示</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/tesseract.min.js"></script>
+    
+    <!-- 配置Tailwind自定义颜色和字体 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4F46E5',
+                        secondary: '#10B981',
+                        neutral: '#F3F4F6',
+                        dark: '#1F2937'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .text-shadow {
+                text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .transition-custom {
+                transition: all 0.3s ease;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans">
+    <!-- 页面头部 -->
+    <header class="bg-gradient-to-r from-primary to-primary/80 text-white shadow-lg">
+        <div class="container mx-auto px-4 py-6">
+            <h1 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-center text-shadow">
+                <i class="fa fa-font mr-2"></i>汉字图片识别与笔画展示
+            </h1>
+            <p class="text-center mt-2 opacity-90">上传包含汉字的图片，识别后点击汉字查看笔画顺序和拼音</p>
+        </div>
+    </header>
+
+    <!-- 主要内容区 -->
+    <main class="container mx-auto px-4 py-8 max-w-5xl">
+        <!-- 图片上传区域 -->
+        <section class="bg-white rounded-xl shadow-md p-6 mb-8 transform hover:shadow-lg transition-custom">
+            <h2 class="text-xl font-semibold mb-4 text-dark flex items-center">
+                <i class="fa fa-upload mr-2 text-primary"></i>上传图片
+            </h2>
+            <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary transition-custom cursor-pointer" id="dropArea">
+                <input type="file" id="fileInput" accept="image/*" class="hidden">
+                <i class="fa fa-picture-o text-5xl text-gray-400 mb-4"></i>
+                <p class="text-gray-600 mb-2">点击或拖拽图片到此处上传</p>
+                <p class="text-sm text-gray-500">支持JPG、PNG等常见图片格式</p>
+            </div>
+            <div id="imagePreview" class="mt-6 hidden">
+                <h3 class="text-lg font-medium mb-2 text-dark">预览图片:</h3>
+                <div class="relative inline-block">
+                    <img id="previewImg" src="" alt="预览图片" class="max-w-full max-h-80 rounded-lg shadow">
+                    <button id="removeImg" class="absolute -top-3 -right-3 bg-red-500 text-white rounded-full w-7 h-7 flex items-center justify-center shadow-md hover:bg-red-600 transition-custom">
+                        <i class="fa fa-times"></i>
+                    </button>
+                </div>
+                <button id="recognizeBtn" class="mt-4 bg-primary hover:bg-primary/90 text-white font-medium py-2 px-6 rounded-lg shadow transition-custom flex items-center">
+                    <i class="fa fa-search mr-2"></i>开始识别
+                </button>
+            </div>
+        </section>
+
+        <!-- 识别结果区域 -->
+        <section id="resultSection" class="hidden bg-white rounded-xl shadow-md p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4 text-dark flex items-center">
+                <i class="fa fa-results mr-2 text-primary"></i>识别结果
+            </h2>
+            <div id="recognitionStatus" class="mb-4 text-gray-600 hidden">
+                <i class="fa fa-circle-o-notch fa-spin mr-2"></i>正在识别中，请稍候...
+            </div>
+            <div id="charactersContainer" class="flex flex-wrap gap-3 mb-6">
+                <!-- 识别出的汉字将在这里显示 -->
+            </div>
+        </section>
+
+        <!-- 汉字详情区域 -->
+        <section id="characterDetail" class="hidden bg-white rounded-xl shadow-md p-6">
+            <h2 class="text-xl font-semibold mb-4 text-dark flex items-center">
+                <i class="fa fa-info-circle mr-2 text-primary"></i>汉字详情
+            </h2>
+            <div class="flex flex-col md:flex-row gap-8">
+                <!-- 左侧：汉字和拼音 -->
+                <div class="md:w-1/3">
+                    <div class="text-center mb-6">
+                        <span id="detailCharacter" class="text-[clamp(3rem,8vw,5rem)] font-bold text-dark"></span>
+                        <div id="detailPinyin" class="text-2xl text-primary mt-2 font-medium"></div>
+                    </div>
+                    <div class="bg-neutral p-4 rounded-lg">
+                        <h3 class="font-semibold mb-2 text-dark">基本信息</h3>
+                        <div id="detailInfo" class="text-gray-700">
+                            <!-- 汉字基本信息 -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 右侧：笔画顺序 -->
+                <div class="md:w-2/3">
+                    <h3 class="font-semibold mb-3 text-dark">笔画顺序</h3>
+                    <div class="bg-neutral rounded-lg p-4 min-h-[300px] flex items-center justify-center">
+                        <div id="strokeOrderContainer" class="relative w-full max-w-xs aspect-square mx-auto">
+                            <!-- 笔画顺序动画将在这里显示 -->
+                            <div id="strokePlaceholder" class="text-center text-gray-500">
+                                <i class="fa fa-pencil text-4xl mb-2"></i>
+                                <p>点击汉字查看笔画顺序</p>
+                            </div>
+                            <canvas id="strokeCanvas" class="w-full h-full hidden"></canvas>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex justify-center gap-2">
+                        <button id="playStroke" class="bg-secondary hover:bg-secondary/90 text-white p-2 rounded-lg transition-custom hidden">
+                            <i class="fa fa-play"></i> 播放
+                        </button>
+                        <button id="resetStroke" class="bg-gray-500 hover:bg-gray-600 text-white p-2 rounded-lg transition-custom hidden">
+                            <i class="fa fa-refresh"></i> 重置
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-dark text-white py-6">
+        <div class="container mx-auto px-4 text-center">
+            <p>汉字图片识别与笔画展示工具 &copy; 2023</p>
+            <p class="text-sm opacity-70 mt-1">本工具仅用于学习交流</p>
+        </div>
+    </footer>
+
+    <script>
+        // 汉字笔画数据 - 示例数据，实际应用中可以扩展更多汉字
+        const strokeData = {
+            "人": {
+                pinyin: "rén",
+                strokes: [
+                    [{x: 0.2, y: 0.3}, {x: 0.8, y: 0.7}],  // 撇
+                    [{x: 0.2, y: 0.7}, {x: 0.8, y: 0.3}]   // 捺
+                ],
+                info: "部首：人，总笔画：2画，结构：单一结构，含义：能制造工具并使用工具进行劳动的高等动物。"
+            },
+            "口": {
+                pinyin: "kǒu",
+                strokes: [
+                    [{x: 0.3, y: 0.2}, {x: 0.7, y: 0.2}],  // 竖
+                    [{x: 0.7, y: 0.2}, {x: 0.7, y: 0.8}],  // 横折
+                    [{x: 0.7, y: 0.8}, {x: 0.3, y: 0.8}]   // 横
+                ],
+                info: "部首：口，总笔画：3画，结构：单一结构，含义：人和动物吃东西和发声的器官。"
+            },
+            "木": {
+                pinyin: "mù",
+                strokes: [
+                    [{x: 0.5, y: 0.2}, {x: 0.5, y: 0.8}],  // 横
+                    [{x: 0.3, y: 0.4}, {x: 0.7, y: 0.4}],  // 竖
+                    [{x: 0.3, y: 0.2}, {x: 0.7, y: 0.8}],  // 撇
+                    [{x: 0.3, y: 0.8}, {x: 0.7, y: 0.2}]   // 捺
+                ],
+                info: "部首：木，总笔画：4画，结构：单一结构，含义：树类植物的通称。"
+            },
+            "水": {
+                pinyin: "shuǐ",
+                strokes: [
+                    [{x: 0.3, y: 0.5}, {x: 0.7, y: 0.5}],  // 竖钩
+                    [{x: 0.5, y: 0.3}, {x: 0.3, y: 0.7}],  // 横撇
+                    [{x: 0.5, y: 0.3}, {x: 0.7, y: 0.7}]   // 撇捺
+                ],
+                info: "部首：水，总笔画：4画，结构：单一结构，含义：一种无色、无臭、透明的液体。"
+            },
+            "火": {
+                pinyin: "huǒ",
+                strokes: [
+                    [{x: 0.3, y: 0.4}, {x: 0.7, y: 0.4}],  // 点
+                    [{x: 0.3, y: 0.6}, {x: 0.5, y: 0.2}],  // 撇
+                    [{x: 0.5, y: 0.2}, {x: 0.7, y: 0.6}],  // 撇
+                    [{x: 0.3, y: 0.8}, {x: 0.7, y: 0.8}]   // 捺
+                ],
+                info: "部首：火，总笔画：4画，结构：单一结构，含义：燃烧，物质燃烧时所发出的光和焰。"
+            }
+        };
+
+        // DOM元素
+        const dropArea = document.getElementById('dropArea');
+        const fileInput = document.getElementById('fileInput');
+        const imagePreview = document.getElementById('imagePreview');
+        const previewImg = document.getElementById('previewImg');
+        const removeImg = document.getElementById('removeImg');
+        const recognizeBtn = document.getElementById('recognizeBtn');
+        const resultSection = document.getElementById('resultSection');
+        const recognitionStatus = document.getElementById('recognitionStatus');
+        const charactersContainer = document.getElementById('charactersContainer');
+        const characterDetail = document.getElementById('characterDetail');
+        const detailCharacter = document.getElementById('detailCharacter');
+        const detailPinyin = document.getElementById('detailPinyin');
+        const detailInfo = document.getElementById('detailInfo');
+        const strokePlaceholder = document.getElementById('strokePlaceholder');
+        const strokeCanvas = document.getElementById('strokeCanvas');
+        const strokeOrderContainer = document.getElementById('strokeOrderContainer');
+        const playStroke = document.getElementById('playStroke');
+        const resetStroke = document.getElementById('resetStroke');
+
+        // 获取Canvas上下文
+        const ctx = strokeCanvas.getContext('2d');
+        
+        // 当前正在展示的汉字
+        let currentCharacter = null;
+        // 笔画动画相关变量
+        let animationFrameId = null;
+        let animationStartTime = null;
+        let animationDuration = 5000; // 整个动画持续时间（毫秒）
+
+        // 初始化事件监听
+        function initEventListeners() {
+            // 拖放上传
+            dropArea.addEventListener('click', () => fileInput.click());
+            
+            // 阻止默认的拖放行为
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, preventDefaults, false);
+                document.body.addEventListener(eventName, preventDefaults, false);
+            });
+            
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            dropArea.addEventListener('dragover', highlight);
+            dropArea.addEventListener('dragleave', unhighlight);
+            dropArea.addEventListener('drop', unhighlight);
+            
+            function highlight() {
+                dropArea.classList.add('border-primary');
+                dropArea.classList.add('bg-primary/5');
+            }
+            
+            function unhighlight() {
+                dropArea.classList.remove('border-primary');
+                dropArea.classList.remove('bg-primary/5');
+            }
+            
+            dropArea.addEventListener('drop', handleDrop);
+            
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const file = dt.files[0];
+                if (file) {
+                    handleFile(file);
+                }
+            }
+            
+            // 文件选择
+            fileInput.addEventListener('change', () => {
+                if (fileInput.files.length) {
+                    handleFile(fileInput.files[0]);
+                }
+            });
+            
+            // 移除图片
+            removeImg.addEventListener('click', () => {
+                resetAppState();
+            });
+            
+            // 开始识别
+            recognizeBtn.addEventListener('click', recognizeCharacters);
+            
+            // 笔画控制
+            playStroke.addEventListener('click', playStrokeAnimation);
+            resetStroke.addEventListener('click', resetStrokeAnimation);
+            
+            // 调整窗口大小时重绘Canvas
+            window.addEventListener('resize', () => {
+                if (currentCharacter) {
+                    drawStrokePreview(currentCharacter);
+                }
+            });
+        }
+
+        // 重置应用状态
+        function resetAppState() {
+            imagePreview.classList.add('hidden');
+            previewImg.src = '';
+            fileInput.value = '';
+            resultSection.classList.add('hidden');
+            charactersContainer.innerHTML = '';
+            characterDetail.classList.add('hidden');
+            resetStrokeAnimation();
+        }
+
+        // 处理上传的文件
+        function handleFile(file) {
+            if (!file.type.match('image.*')) {
+                alert('请上传图片文件');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImg.src = e.target.result;
+                imagePreview.classList.remove('hidden');
+                resultSection.classList.add('hidden');
+                charactersContainer.innerHTML = '';
+                characterDetail.classList.add('hidden');
+                resetStrokeAnimation();
+            };
+            reader.onerror = () => {
+                alert('文件读取失败，请重试');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // 识别图片中的汉字
+        function recognizeCharacters() {
+            if (!previewImg.src) return;
+            
+            resultSection.classList.remove('hidden');
+            charactersContainer.innerHTML = '';
+            recognitionStatus.classList.remove('hidden');
+            
+            // 创建图片预处理的Canvas
+            const processCanvas = document.createElement('canvas');
+            const processCtx = processCanvas.getContext('2d');
+            
+            // 加载预览图片
+            const img = new Image();
+            img.src = previewImg.src;
+            
+            img.onload = function() {
+                // 设置Canvas尺寸
+                processCanvas.width = img.width;
+                processCanvas.height = img.height;
+                
+                // 绘制图片到Canvas
+                processCtx.drawImage(img, 0, 0);
+                
+                // 简单的图片预处理 - 转换为灰度图
+                const imageData = processCtx.getImageData(0, 0, processCanvas.width, processCanvas.height);
+                const data = imageData.data;
+                
+                for (let i = 0; i < data.length; i += 4) {
+                    const gray = 0.2989 * data[i] + 0.5870 * data[i + 1] + 0.1140 * data[i + 2];
+                    data[i] = gray;     // red
+                    data[i + 1] = gray; // green
+                    data[i + 2] = gray; // blue
+                }
+                
+                // 应用阈值处理（二值化）
+                const threshold = 128;
+                for (let i = 0; i < data.length; i += 4) {
+                    data[i] = data[i] > threshold ? 255 : 0;     // red
+                    data[i + 1] = data[i + 1] > threshold ? 255 : 0; // green
+                    data[i + 2] = data[i + 2] > threshold ? 255 : 0; // blue
+                }
+                
+                // 将处理后的图像数据放回Canvas
+                processCtx.putImageData(imageData, 0, 0);
+                
+                // 将处理后的图片转换为URL用于识别
+                const processedImageUrl = processCanvas.toDataURL('image/jpeg');
+                
+                // 使用Tesseract.js进行OCR识别，优化参数
+                Tesseract.recognize(
+                    processedImageUrl,
+                    'chi_sim', // 简体中文
+                    {
+                        logger: (m) => console.log(m),
+                        // 优化OCR引擎参数
+                        tessedit_char_whitelist: '一二三四五六七八九十百千万亿零壹贰叁肆伍陆柒捌玖拾佰仟萬億', // 白名单字符
+                        preserve_interword_spaces: '1', // 保留单词间距
+                        tessedit_pageseg_mode: 6, // 假设为统一文本块
+                        tessedit_ocr_engine_mode: 1 // 使用LSTM引擎
+                    }
+                ).then(({ data: { text } }) => {
+                    recognitionStatus.classList.add('hidden');
+                    
+                    // 过滤非汉字字符
+                    const chineseChars = text.replace(/[^\u4e00-\u9fa5]/g, '');
+                    
+                    if (chineseChars.length === 0) {
+                        // 尝试使用更宽松的过滤
+                        const 宽松Chars = text.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '');
+                        if (宽松Chars.length > 0) {
+                            charactersContainer.innerHTML = '<p class="text-amber-500">仅识别出非汉字字符：' + 宽松Chars + '</p>';
+                        } else {
+                            charactersContainer.innerHTML = '<p class="text-gray-500">未识别出任何字符，请尝试调整图片或提高清晰度</p>';
+                        }
+                        return;
+                    }
+                    
+                    // 显示识别出的汉字
+                    const uniqueChars = [...new Set(chineseChars.split(''))]; // 去重
+                    uniqueChars.forEach(char => {
+                        const charElement = document.createElement('div');
+                        charElement.className = 'bg-primary/10 hover:bg-primary/20 text-dark text-xl md:text-2xl font-medium w-12 h-12 md:w-16 md:h-16 rounded-lg flex items-center justify-center cursor-pointer transition-custom shadow-sm hover:shadow';
+                        charElement.textContent = char;
+                        charElement.addEventListener('click', () => showCharacterDetail(char));
+                        charactersContainer.appendChild(charElement);
+                    });
+                }).catch(err => {
+                    console.error('识别出错:', err);
+                    recognitionStatus.classList.add('hidden');
+                    
+                    // 提供更具体的错误信息
+                    if (err.message.includes('Failed to load language')) {
+                        charactersContainer.innerHTML = '<p class="text-red-500">OCR语言包加载失败，请确保网络连接正常</p>';
+                    } else {
+                        charactersContainer.innerHTML = '<p class="text-red-500">识别出错：' + err.message + '</p>';
+                    }
+                });
+            };
+            
+            img.onerror = function() {
+                recognitionStatus.classList.add('hidden');
+                charactersContainer.innerHTML = '<p class="text-red-500">图片加载失败，请尝试重新上传</p>';
+            };
+        }
+
+        // 显示汉字详情
+        function showCharacterDetail(char) {
+            // 检查是否有该汉字的笔画数据
+            if (!strokeData[char]) {
+                alert('暂未收录 "' + char + '" 的笔画数据');
+                return;
+            }
+            
+            currentCharacter = char;
+            const data = strokeData[char];
+            
+            // 更新详情区域
+            detailCharacter.textContent = char;
+            detailPinyin.textContent = data.pinyin;
+            detailInfo.textContent = data.info;
+            
+            // 显示详情区域
+            characterDetail.classList.remove('hidden');
+            
+            // 准备笔画展示
+            strokePlaceholder.classList.add('hidden');
+            strokeCanvas.classList.remove('hidden');
+            playStroke.classList.remove('hidden');
+            resetStroke.classList.remove('hidden');
+            
+            // 设置Canvas尺寸
+            resizeCanvas();
+            
+            // 绘制初始状态
+            drawStrokePreview(char);
+        }
+
+        // 调整Canvas尺寸
+        function resizeCanvas() {
+            const container = strokeOrderContainer.getBoundingClientRect();
+            strokeCanvas.width = container.width;
+            strokeCanvas.height = container.height;
+        }
+
+        // 绘制笔画预览
+        function drawStrokePreview(char) {
+            const data = strokeData[char];
+            if (!data) return;
+            
+            ctx.clearRect(0, 0, strokeCanvas.width, strokeCanvas.height);
+            
+            // 绘制田字格
+            drawGrid();
+            
+            // 绘制所有笔画的预览
+            data.strokes.forEach((stroke, index) => {
+                drawStroke(stroke, index, 1); // 1表示完整绘制
+            });
+        }
+
+        // 绘制田字格
+        function drawGrid() {
+            const width = strokeCanvas.width;
+            const height = strokeCanvas.height;
+            const margin = width * 0.1;
+            
+            ctx.strokeStyle = '#ccc';
+            ctx.lineWidth = 1;
+            
+            // 外框
+            ctx.strokeRect(margin, margin, width - margin * 2, height - margin * 2);
+            
+            // 十字线
+            ctx.beginPath();
+            ctx.moveTo(margin, height / 2);
+            ctx.lineTo(width - margin, height / 2);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(width / 2, margin);
+            ctx.lineTo(width / 2, height - margin);
+            ctx.stroke();
+            
+            // 对角线
+            ctx.beginPath();
+            ctx.moveTo(margin, margin);
+            ctx.lineTo(width - margin, height - margin);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(width - margin, margin);
+            ctx.lineTo(margin, height - margin);
+            ctx.stroke();
+        }
+
+        // 绘制单个笔画
+        function drawStroke(points, strokeIndex, progress) {
+            const width = strokeCanvas.width;
+            const height = strokeCanvas.height;
+            const margin = width * 0.1;
+            
+            // 计算实际坐标
+            const startX = points[0].x * (width - margin * 2) + margin;
+            const startY = points[0].y * (height - margin * 2) + margin;
+            const endX = points[1].x * (width - margin * 2) + margin;
+            const endY = points[1].y * (height - margin * 2) + margin;
+            
+            // 设置笔画样式
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            // 绘制当前笔画
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            
+            // 根据进度计算终点
+            const currentX = startX + (endX - startX) * progress;
+            const currentY = startY + (endY - startY) * progress;
+            
+            ctx.lineTo(currentX, currentY);
+            
+            // 设置颜色（当前笔画为红色，已完成笔画为黑色）
+            ctx.strokeStyle = progress < 1 ? '#ef4444' : '#1f2937';
+            ctx.stroke();
+            
+            // 在笔画起点绘制序号
+            if (progress >= 1) {
+                ctx.fillStyle = '#4f46e5';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(strokeIndex + 1, startX, startY);
+            }
+        }
+
+        // 播放笔画动画
+        function playStrokeAnimation() {
+            if (!currentCharacter) return;
+            
+            cancelAnimationFrame(animationFrameId);
+            animationStartTime = null;
+            
+            const data = strokeData[currentCharacter];
+            if (!data) return;
+            
+            function animate(timestamp) {
+                if (!animationStartTime) animationStartTime = timestamp;
+                const elapsed = timestamp - animationStartTime;
+                const progress = Math.min(elapsed / animationDuration, 1);
+                
+                ctx.clearRect(0, 0, strokeCanvas.width, strokeCanvas.height);
+                drawGrid();
+                
+                // 计算当前应该显示的笔画
+                const totalStrokes = data.strokes.length;
+                const strokesCompleted = Math.floor(progress * totalStrokes);
+                const currentStrokeProgress = (progress * totalStrokes) % 1;
+                
+                // 绘制已完成的笔画
+                for (let i = 0; i < strokesCompleted; i++) {
+                    drawStroke(data.strokes[i], i, 1);
+                }
+                
+                // 绘制当前正在绘制的笔画
+                if (strokesCompleted < totalStrokes) {
+                    drawStroke(data.strokes[strokesCompleted], strokesCompleted, currentStrokeProgress);
+                }
+                
+                if (progress < 1) {
+                    animationFrameId = requestAnimationFrame(animate);
+                } else {
+                    playStroke.innerHTML = '<i class="fa fa-repeat"></i> 重播';
+                }
+            }
+            
+            animationFrameId = requestAnimationFrame(animate);
+        }
+
+        // 重置笔画动画
+        function resetStrokeAnimation() {
+            cancelAnimationFrame(animationFrameId);
+            animationStartTime = null;
+            
+            if (currentCharacter) {
+                drawStrokePreview(currentCharacter);
+                playStroke.innerHTML = '<i class="fa fa-play"></i> 播放';
+            }
+        }
+
+        // 初始化应用
+        function initApp() {
+            initEventListeners();
+            console.log('应用已初始化');
+        }
+
+        // 当DOM加载完成后初始化应用
+        document.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
+    
